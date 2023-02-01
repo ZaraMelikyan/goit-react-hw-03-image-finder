@@ -56,7 +56,7 @@ export class App extends Component {
       return;
     }
 
-    const totalPages = Math.floor(res.totalHits / 12);
+    const totalPages = Math.ceil(res.totalHits / 12);
 
     this.setState({
       images: res.hits,
