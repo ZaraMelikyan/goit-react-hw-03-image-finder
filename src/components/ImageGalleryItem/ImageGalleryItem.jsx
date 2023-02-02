@@ -8,7 +8,7 @@ class ImageGalleryItem extends Component {
     isOpen: false,
   };
 
-  toggle = () => {
+  toggleModal = () => {
     this.setState(({ isOpen }) => ({ isOpen: !isOpen }));
   };
 
@@ -18,11 +18,11 @@ class ImageGalleryItem extends Component {
 
     return (
       <>
-        <GalleryItem onClick={this.toggle}>
+        <GalleryItem onClick={this.toggleModal}>
           <GalleryImage src={webformatURL} alt={tags} />
         </GalleryItem>
         {isOpen && (
-          <Modal toggle={this.toggle} image={largeImageURL} tags={tags} />
+          <Modal onClose={this.toggleModal} image={largeImageURL} tags={tags} />
         )}
       </>
     );

@@ -6,71 +6,124 @@ import { Notify } from 'notiflix/build/notiflix-notify-aio';
 export class App extends Component {
   state = {
     images: [],
-    query: null,
-    page: 1,
-    totalPages: null,
-    loading: false,
-  };
+    query: '',
+    page: 0,
+    lastPage: 0,
+    status: 'idle',
+  }
 
   async componentDidUpdate(_, prevState) {
-    const { query, page, totalPages, images } = this.state;
+
+    const { query, page } = this.state;
 
     if (prevState.page !== page && page !== 1) {
-      this.setState({ loading: true });
-      const res = await getImages(query, page);
-
-      this.setState(({ images }) => ({
-        images: [...images, ...res.hits],
-        loading: false,
-      }));
-
-      setTimeout(() => this.scroll(), 1);
+      this.setState({ status: 'pending' });
+      this.loadMore(query, page);
     }
 
-    if (page >= totalPages && images !== prevState.images) {
-      Notify.warning(
-        "We're sorry, but you've reached the end of search results."
-      );
+    if (prevState.query !== query && query !== "") {
+      this.setState({ status: 'pending' });
+      this.makeNewFetch(query, page)
     }
   }
 
-  onSubmit = async evt => {
-    evt.preventDefault();
-    const input = evt.target.elements.search;
-    const value = input.value.trim();
+  //async componentDidUpdate(_, prevState) {
+
+  //  const { query, page } = this.state;
+
+  //  if (prevState.page !== page && page !== 1) {
+  //    this.setState({ status: 'pending' });
+  //    this.loadMore(query,page);
+  //  }
+
+  //  if (prevState.query !== query && query !== "") {
+  //    this.setState({ status: 'pending' });
+  //    this.makeNewFetch(query, page)
+  //  }
+  // }
+
+
+  makeNewFetch = async (newQuery, page) => {
+    try {
+      const response = await getImages(newQuery, page);
+      const { totalHits, hits } = response;
+
+      if (totalHits === 0) {
+        this.setState({ lastPage: 1, status: 'rejected' });
+        Notify.failure('Sorry, there are no images matching your search request. Please try another request.');
+        return;
+      }
+
+      const lastPage = Math.ceil(totalHits / 12);
+      this.setState({ lastPage, images: hits, status: 'resolved' });
+      Notify.success(`Hurray! ${totalHits} images found`);
+
+    } catch (error) {
+      this.setState({ status: 'rejected' });
+      console.log(error.message);
+    }
+  }
+  
+
+  loadMore = async (query, page) => {
+    try {
+      const response = await getImages(query, page);
+      this.setState(({ images }) => ({ images: [...images, ...response.hits], status: 'resolved' }));
+      setTimeout(() => this.scroll(), 100);
+
+    } catch (error) {
+      this.setState({ status: 'rejected' });
+      console.log(error.message);
+    }
+  }
+
+  
+
+
+  onSubmit = async (query) => {
     const page = 1;
 
-    if (value === '') {
-      Notify.warning("You didn't enter anything!");
-      return;
-    }
-
-    this.setState({ loading: true });
-    const res = await getImages(value, page);
-    this.setState({ loading: false });
-
-    if (res.hits.length === 0) {
-      Notify.failure(
-        'Sorry, there are no images matching your search query. Please try again.'
-      );
-      return;
-    }
-
-    const totalPages = Math.ceil(res.totalHits / 12);
-
     this.setState({
-      images: res.hits,
-      query: value,
+      query: query,
       page,
-      totalPages: totalPages,
+      images: [],
+      status: 'pending'
     });
-  };
 
-  loadMore = () => {
-    this.setState(prevState => ({
-      page: prevState.page + 1,
-    }));
-  };
+  }
+
+  //onSubmit = async evt => {
+  //  evt.preventDefault();
+  //  const input = evt.target.elements.search;
+  //  const value = input.value.trim();
+  //  const page = 1;
+
+    
+  //   this.setState({ loading: true });
+  //   const res = await getImages(value, page);
+  //  this.setState({ loading: false });
+
+  //  if (res.hits.length === 0) {
+  //    Notify.failure(
+  //      'Sorry, there are no images matching your search query. Please try again.'
+  //    );
+  //    return;
+  //   }
+
+  //  const totalPages = Math.ceil(res.totalHits / 12);
+
+  //  this.setState({
+  //    images: res.hits,
+  //    query: value,
+  //    page,
+  //    totalPages: totalPages,
+  //  });
+  // };
+
+
+  handleBtnClick = () => {
+    this.setState(prevState => ({ page: prevState.page + 1, }));
+  }
 
   scroll = () => {
     const { clientHeight } = document.documentElement;
@@ -81,19 +134,17 @@ export class App extends Component {
   };
 
   render() {
-    const { images, loading, totalPages, page } = this.state;
-    const isNotEmpty = images.length !== 0;
-    const isNotEndList = page < totalPages;
+  
+    const { images, page, lastPage, status } = this.state;
+   
 
     return (
       <>
-        <Searchbar onSubmit={this.onSubmit} />
-        {isNotEmpty && <ImageGallery images={images} />}
-        {loading ? (
-          <Loader />
-        ) : (
-          isNotEmpty && isNotEndList && <Button onClick={this.loadMore} />
-        )}
+        <Searchbar onSubmit={this.onSubmit} isSubmitting={status === 'pending'} />
+        {images.length > 0 && <ImageGallery images={images} />}
+        {status === 'pending'
+          ? (<Loader />)
+          : page !== lastPage && (<Button onClick={this.handleBtnClick} />)}
       </>
     );
   }
